@@ -381,7 +381,7 @@ namespace State
     λ i x h => soundness' P i (f x) h
 end State
 
-section Relabel
+namespace Relabel
   open Free Maybe State
 
   inductive Tree (a : Type) : Type where
@@ -782,7 +782,7 @@ namespace Nondeterminism
   infix:50 "∈'" => Mem
 
   def delete {a : Type} {x : a} : (xs : List a) → x ∈' xs → List a
-    | []       , h => nomatch h
+    | [] ,       h => nomatch h
     | (x :: xs), h => match h with
       | Mem.head   => xs
       | Mem.tail h => x :: delete xs h
@@ -1217,4 +1217,83 @@ namespace StateExample
   def max : derivationFun ⟨maxPre, maxPost⟩ :=
     λ xs => refineDerivation (maxProof xs) (max' xs)
 end StateExample
+
+namespace Extension
+  open Free
+
+  def subset' {α : Type u} (P Q : α → Prop) : Prop :=
+    ∀ a, P a → Q a
+
+  infix:50 "⊆'" => subset'
+
+  structure Spec (α : Type u) (β : α → Type v) : Type (max u v) where
+    pre  : α → Prop
+    post : (a : α) → β a → Prop
+
+  def wpSpec {α : Type u} {β : α → Type v} (spec : Spec α β) (P : (a : α) → β a → Prop) : α → Prop :=
+    λ a => spec.pre a ∧ spec.post a ⊆' P a
+
+  inductive I (α : Type u) (β : α → Type v) (a : α) where
+    | done : β a → I α β a
+    | hole : Spec α β → I α β a
+
+  def ptI {α : Type u} {β : α → Type v} (P : (a : α) → β a → Prop) : (a : α) → I α β a → Prop
+    | a, I.done b    => P a b
+    | a, I.hole spec => wpSpec spec P a
+
+  def M (C : Type) (R : C → Type) (α : Type u) (β : α → Type v) (a : α) := Free C R (I α β a)
+
+  def pt {α : Type u} (ptalgebra : (c : C) → (R c → Prop) → Prop) (P : α → Prop) : Free C R α → Prop
+    | Free.pure a   => P a
+    | Free.step c k => ptalgebra c (λ r => pt ptalgebra P (k r))
+
+  def pt' {α : Type u} {β : α → Type v} (ptalgebra : α → (c : C) → (R c → Prop) → Prop) (P : (a : α) → β a -> Prop) : (a : α) → Free C R (β a) -> Prop :=
+    λ a => pt (ptalgebra a) (P a)
+
+  def wpE {α : Type u} {β : α → Type v} (ptalgebra : α → (c : C) → (R c → Prop) → Prop) (f : (a : α) → Free C R (β a)) (P : (a : α) → β a → Prop) : α → Prop :=
+    wp f (pt' ptalgebra P)
+
+  def wpM {α : Type u} {β : α → Type v} (ptalgebra : α → (c : C) → (R c → Prop) → Prop) (f : (a : α) → M C R α β a) (P : (a : α) → β a → Prop) : α → Prop :=
+    wpE ptalgebra f (λ a i => ptI P a i)
+
+  variable (s : Type)
+
+  inductive C where
+    | get : C
+    | put : s → C
+
+  def R : C s → Type
+    | C.get   => s
+    | C.put _ => PUnit
+
+  def ptalgebra : s → (c : C s) → (R s c → Prop) → Prop
+    | i, C.get,     P => P i
+    | _, (C.put _), P => P ()
+
+  def done (a : α) (b : β a) : M (C s) (R s) α β a :=
+    Free.pure (I.done b)
+
+  def get' (init : s) : M (C s) (R s) s (K s × s) init :=
+    Free.step C.get (λ r => done s init (r, init))
+
+  def put' (x : s) (init : s) : M (C s) (R s) s (K PUnit × s) init :=
+    Free.step (C.put x) (λ r => done s init (r, x))
+
+  def getPost :     s → s     × s → Prop := λ   s (o, s') => o = s ∧ s' = s
+  def putPost : s → s → PUnit × s → Prop := λ x _ (_, s') => s' = x
+
+  theorem getCorrect : ∀   pre, wpSpec ⟨pre, λ i o => pre i ∧ getPost s   i o⟩ ⊑ wpM (ptalgebra s) (λ init => get' s   init) := by
+    intro _ _ _ h
+    apply h.right
+    apply And.intro
+    . exact h.left
+    . simp [getPost]
+
+  theorem putCorrect : ∀ x pre, wpSpec ⟨pre, λ i o => pre i ∧ putPost s x i o⟩ ⊑ wpM (ptalgebra s) (λ init => put' s x init) := by
+    intro _ _ _ _ h
+    apply h.right
+    apply And.intro
+    . exact h.left
+    . simp [putPost]
+end Extension
 end PredicateTransformers
