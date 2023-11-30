@@ -240,7 +240,7 @@ namespace Maybe
       pure ((x₁ + x₂) :: xs)
 
   theorem correctnessAdd : wpSpec addSpec ⊑ wpPartial add
-    | _, [],           h              => by simp [wpSpec, addSpec] at h
+    | _, [],           h              => by simp_arith [wpSpec, addSpec] at h
     | _, _ :: [],      h              => by simp [wpSpec, addSpec] at h
     | _, _ :: _ :: _, (And.intro _ h) => h _ Add.addStep
 
@@ -277,7 +277,7 @@ namespace Maybe
     | []               =>
       simp [fastProduct, pure] at h
       cases h
-      simp [product]
+      simp_arith [product]
     | Nat.zero :: _    =>
       simp [fastProduct] at h
       cases h
@@ -765,7 +765,7 @@ namespace Nondeterminism
     apply Iff.intro
     . intro h x y i
       simp [wpAny] at h
-      cases Iff.mp (anyP (λ _ y' => y' = y) (g x)) (h _ x (Iff.mpr (anyP _ (f x)) (Exists.intro y (And.intro i rfl))))
+      cases Iff.mp (@anyP a b x (λ _ y' => y' = y) (g x)) (h (λ _ y' => y' = y) x (by unfold wpAny; exact (Iff.mpr (anyP _ (f x)) (Exists.intro y (And.intro i rfl)))))
       rename_i _ h
       cases h.right
       exact h.left
@@ -901,7 +901,7 @@ namespace Recursion
         simp [o'Post]
       case isFalse h₂ =>
         simp [h₂] at oPost
-        simp [oPost] at h₁
+        simp_arith [oPost] at h₁
     case isFalse h₁ =>
       simp [h₁] at o'Post
       exact o'Post

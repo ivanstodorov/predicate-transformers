@@ -1,9 +1,11 @@
 import Lake
 open Lake DSL
 
-package «predicateTransformers» where
+package «predicateTransformers» {
   -- add any package configuration options here
+}
 
 @[default_target]
-lean_lib «PredicateTransformers» where
+lean_lib «PredicateTransformers» {
   -- add any library configuration options here
+}
